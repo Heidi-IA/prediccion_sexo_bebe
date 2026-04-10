@@ -52,7 +52,7 @@ def index():
                 porcentaje_scores=porcentaje_scores,
                 nombre=nombre,
                 email=email,
-                titulo="Informe Eneagrama Manual",
+                titulo="Informe profundo de autoconocimiento",
                 mensaje_final="Informe generado manualmente",
             )
 
