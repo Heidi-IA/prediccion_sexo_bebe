@@ -1162,470 +1162,9 @@ def juntar_lista_humana(items):
     return ", ".join(items[:-1]) + f" y {items[-1]}"
 
 
-@app.get("/result")
-def result():
-    if not session.get("pago_ok"):
-        return redirect(url_for("index"))
-    questions = load_questions()
-    answers = session.get("answers", {})
-
-    # Contar cuántas respuestas marcaste en total
-    total_marked = sum(1 for qid, val in answers.items() if val)
-
-    # Calcular scores por tipo
-    scores = {t: 0 for t in range(1, 10)}
-    for q in questions:
-        qid = str(q["id"])
-        if answers.get(qid):
-            scores[q["type"]] += 1
-
-    # Transformar a porcentajes (sobre total_marked)
-    porcentaje_scores = {}
-    for tipo, score in scores.items():
-        porcentaje = (score / total_marked * 100) if total_marked > 0 else 0
-        porcentaje_scores[tipo] = round(porcentaje, 1)
-       
-    # ✅ NUEVO: labels/values para el radar (en orden 1..9)
-    labels = [str(i) for i in range(1, 10)]
-    values = [porcentaje_scores[i] for i in range(1, 10)]
-    
-
-    # -----------------------------
-    # Ejes de Afinidad
-    # -----------------------------
-    afinidades = []
-
-    for eje, cfg in EJES_AFINIDAD.items():
-        tipos = cfg["tipos"]
-        prom = round(sum(porcentaje_scores[t] for t in tipos) / len(tipos), 1)
-        estado = clasificar_eje(prom)
-    
-        afinidades.append({
-            "eje": eje,
-            "tipos": tipos,   # ✅ AGREGAR ESTA LÍNEA
-            "valor": prom,
-            "estado": estado,
-            "descripcion": cfg["descripcion"],
-            "perfil_alto": cfg["perfil_alto"],
-            "perfil_bajo": cfg["perfil_bajo"],
-        })
 
 
-    
-    # -----------------------------
-    # Texto: Ejes de Afinidad (como lo indicaste)
-    # -----------------------------
-    afinidades_parrafos = []
-    
-    for a in afinidades:
-        eje = a["eje"]
-        v = a["valor"]
-    
-        txt = a["descripcion"] + "\n\n"
-    
-        # estado
-        if es_bajo(v):
-            txt += "Este eje aparece por debajo de la media, lo que indica que es un área a desarrollar."
-        elif abs(v - 11.1) <= 0.1:
-            txt += "Este eje aparece equilibrado, lo que indica que estas cualidades están presentes de forma estable."
-        else:
-            txt += "Este eje aparece por encima de la media, lo que indica que posees estas características."
-    
-        # ✅ NUEVO: perfiles (sin tocar nada de arriba)
-        perfil_cfg = EJES_AFINIDAD.get(eje, {})
-        if es_bajo(v):
-            perfil = perfil_cfg.get("perfil_bajo", "")
-        else:
-            perfil = perfil_cfg.get("perfil_alto", "")
-    
-        if perfil:
-            txt += "\n\n" + perfil
-    
-        afinidades_parrafos.append(txt)
-
-
-    
-    # -----------------------------
-    # Síntesis de Afinidades (mismo formato que tu síntesis)
-    # -----------------------------
-    ejes_afinidad_bajos = [a for a in afinidades if es_bajo(a["valor"])]
-    ejes_afinidad_ok = [a for a in afinidades if not es_bajo(a["valor"])]
-    
-    # palabras por tipos bajo / ok
-    palabras_desafio = []
-    for a in ejes_afinidad_bajos:
-        for t in a["tipos"]:
-            p = PALABRAS_AFINIDAD_POR_TIPO.get(t)
-            if p and p not in palabras_desafio:
-                palabras_desafio.append(p)
-    
-    palabras_virtudes = []
-    for a in ejes_afinidad_ok:
-        for t in a["tipos"]:
-            p = PALABRAS_AFINIDAD_POR_TIPO.get(t)
-            if p and p not in palabras_virtudes:
-                palabras_virtudes.append(p)
-    
-    sintesis_afinidades_parrafos = []
-    
-    if ejes_afinidad_bajos:
-        nombres_bajos = [a["eje"] for a in ejes_afinidad_bajos]
-        p1 = (
-            f"Aquí se encuentra tu principal desafío evolutivo en los ejes de "
-            f"{juntar_lista_humana(nombres_bajos)}. "
-            f"Las virtudes a desarrollar son {juntar_lista_humana(palabras_desafio)}."
-        )
-        sintesis_afinidades_parrafos.append(p1)
-    
-    if ejes_afinidad_ok:
-        p2 = f"Tus principales virtudes son {juntar_lista_humana(palabras_virtudes)}."
-        sintesis_afinidades_parrafos.append(p2)
-    
-    # tal como lo pediste (frase fija)
-    sintesis_afinidades_parrafos.append(
-        "Estas cualidades constituyen pilares de tu estructura personal, aunque será importante moderarlas cuando se intensifiquen en exceso."
-    )
-    
-    opuestos = []
-    opuestos_parrafos = []
-    
-    for eje, cfg in OPUESTOS_COMPLEMENTARIOS.items():
-        tipos = cfg["tipos"]
-        prom = round(sum(porcentaje_scores[t] for t in tipos) / len(tipos), 1)
-        estado = clasificar_eje(prom)
-    
-        opuestos.append({
-            "eje": eje,
-            "valor": prom,
-            "estado": estado,
-            "tipos": tipos,
-            "virtudes": cfg.get("virtudes", {}),
-        })
-    
-        txt = cfg["descripcion"] + "\n\n"
-    
-        if es_bajo(prom):
-            txt += cfg["msg_bajo"]
-        elif abs(prom - 11.1) <= 0.1:
-            txt += cfg["msg_equilibrado"]
-        else:
-            txt += cfg["msg_alto"]
-    
-        # Luz / sombra del eje (siempre visible)
-        txt += "\n\n" + cfg["luz"]
-        txt += "\n" + cfg["sombra"]
-    
-        opuestos_parrafos.append(txt)
-
-    ejes_bajo = [o["eje"] for o in opuestos if es_bajo(o["valor"])]
-    ejes_exceso = [o["eje"] for o in opuestos if o["estado"] in ("elevado", "excesivo")]
-    
-    virtudes_desafio = []
-    virtudes_ok = []
-    
-    for o in opuestos:
-        for t in o["tipos"]:
-            palabra = o["virtudes"].get(t)
-            if not palabra:
-                continue
-            if es_bajo(porcentaje_scores[t]):
-                if palabra not in virtudes_desafio:
-                    virtudes_desafio.append(palabra)
-            else:
-                if palabra not in virtudes_ok:
-                    virtudes_ok.append(palabra)
-    
-    opuestos_sintesis = []
-    
-    if ejes_bajo:
-        opuestos_sintesis.append(
-            f"Aquí se encuentra tu principal desafío evolutivo en los ejes del {juntar_lista_humana(ejes_bajo)}. "
-            f"Las virtudes a desarrollar son {juntar_lista_humana(virtudes_desafio)}."
-        )
-    
-    if virtudes_ok:
-        opuestos_sintesis.append(
-            f"Tus principales virtudes son {juntar_lista_humana(virtudes_ok)}."
-        )
-    
-    if ejes_exceso:
-        opuestos_sintesis.append(
-            "Estas cualidades constituyen pilares de tu estructura personal, aunque será importante moderarlas cuando se intensifiquen en exceso."
-        )
-
-    
-    # -----------------------------
-    # Ejes de equilibrio (promedio)
-    # -----------------------------
-    ejes = []
-    for eje in ORDEN_EJES:
-        cfg = EJES_SIMETRIA[eje]
-        tipos = cfg["tipos"]
-        antidoto = cfg["antidoto"]
-
-        # promedio de porcentajes (regla tuya)
-        prom = sum(porcentaje_scores[t] for t in tipos) / len(tipos)
-        prom = round(prom, 1)
-
-        estado = clasificar_eje(prom)
-
-        virtudes = [VIRTUDES_POR_TIPO[t] for t in tipos]
-        ejes.append({
-            "eje": eje,
-            "valor": prom,
-            "estado": estado,
-            "antidoto": antidoto,
-            "virtudes": virtudes,
-            "tipos": tipos,
-        })
-
-    # -----------------------------
-    # Texto: Análisis de Ejes
-    # -----------------------------
-    analisis_ejes_parrafos = []
-    for item in ejes:
-        eje = item["eje"]
-        v = item["valor"]
-        est = item["estado"]
-        antidoto = item["antidoto"]
-
-        if eje == "HACER":
-            if es_bajo(v):
-                base = (
-                    "El eje del HACER aparece por debajo de la media, lo que indica que "
-                    "hay algo urgente que necesita ponerse en acción. En esta etapa, el desafío es "
-                    "dejar de evaluar o postergar y hacer lo que debas hacer para avanzar."
-                    f" Antídoto: {antidoto}."
-                )
-            else:
-                base = (
-                    "El eje del HACER se encuentra por encima de la media, indicando una marcada orientación "
-                    "a la acción, ejecución y control. En su luz, esto implica claridad sobre tu ideal de vida "
-                    "y capacidad de concretar; en su sombra, puede traducirse en controlarte y controlar el entorno "
-                    "de forma permanente."
-                )
-                if est in ("elevado", "excesivo"):
-                    base += f" Si esta energía se intensifica, conviene moderarla. Antídoto: {antidoto}."
-            analisis_ejes_parrafos.append(base)
-            continue
-    
-        if eje == "COMUNICAR":
-            if es_bajo(v):
-                base = (
-                  "El eje del COMUNICAR aparece por debajo de la media, lo que indica que "
-                  "hay algo importante que no estás diciendo o expresando. Esto se vincula con tu mundo interno: "
-                  "aunque tema las consecuencias, comunicar lo esencial es parte de tu sanación."
-                  f" Antídoto: {antidoto}."
-                )
-            else:
-                base = (
-                  "El eje del COMUNICAR se encuentra por encima de la media. En su luz, "
-                  "indica una buena capacidad de comunicación: saber escuchar, llegar al otro y conectar con empatía; "
-                  "en su sombra, puede aparecer hablar mucho sin decir lo esencial."
-                )
-                # si está muy alto, sugerimos moderar
-                if item["estado"] in ("elevado", "excesivo"):
-                    base += f" Antídoto: {antidoto}."
-            analisis_ejes_parrafos.append(base)
-            continue
-    
-    
-        if eje == "TENER":
-            if es_bajo(v):
-                base = (
-                    "El eje del TENER aparece por debajo de la media, lo que sugiere una carencia en la forma "
-                    "de sostener recursos, seguridad y valoración interna. Esto puede expresarse como dificultad "
-                    "para reconocer tu propio valor, ordenar prioridades, poner precio/cobrar, administrar o pedir lo "
-                    "que necesitás sin culpa."
-                    f" Antídoto: {antidoto}."
-                )
-            else:
-                base = (
-                    "El eje del TENER se encuentra por encima de la media. En su luz, indica capacidad para trabajar, "
-                    "lograr y alcanzar lo que querés, con decisión y empuje; en su sombra, puede llevar a desatender lo "
-                    "afectivo, lo físico o lo espiritual por una preocupación excesiva por el tener."
-                )
-                if est in ("elevado", "excesivo"):
-                    base += f" Si se intensifica, practicá moderación. Antídoto: {antidoto}."
-            analisis_ejes_parrafos.append(base)
-            continue
-    
-    
-        if eje == "SER":
-            if es_bajo(v):
-                base = (
-                    "El eje del SER aparece por debajo de la media, indicando que hay un llamado a profundizar: "
-                    "mirarte a vos misma y a tu realidad con más honestidad y reflexión. No se trata de aislarse, "
-                    "sino de hacer un trabajo de introspección que te devuelva claridad y sentido."
-                    f" Antídoto: {antidoto}."
-                )
-            else:
-                base = (
-                    "El eje del SER se encuentra por encima de la media. En su luz, indica profundidad y reflexión, "
-                    "una buena mirada de la vida y de vos misma; en su sombra, puede traducirse en encerrarte, "
-                    "aislarte o esconderte, evitando mirar una parte de tu realidad que no te gusta."
-                )
-                if est in ("elevado", "excesivo"):
-                    base += f" Si se intensifica, cuidá no aislarte. Antídoto: {antidoto}."
-            analisis_ejes_parrafos.append(base)
-            continue
-    
-        if eje == "ESTAR":
-            if es_bajo(v):
-                base = (
-                    "El eje del ESTAR aparece por debajo de la media, indicando dificultad para habitar el presente: "
-                    "podés estar pendiente del pasado o del futuro, o viviendo con tensión. El desafío evolutivo es "
-                    "aprender a estar aquí y ahora, sosteniendo tu centro."
-                    f" Antídoto: {antidoto}."
-                )
-            else:
-                base = (
-                    "El eje del ESTAR se encuentra por encima de la media. En su luz, indica presencia y capacidad de "
-                    "vivir el presente con intensidad; en su sombra, puede aparecer una forma de 'estar sin estar': "
-                    "se evita el conflicto o se busca que no haya problemas, pero internamente no hay presencia real."
-                )
-                if est in ("elevado", "excesivo"):
-                    base += f" Si se intensifica, buscá presencia genuina. Antídoto: {antidoto}."
-            analisis_ejes_parrafos.append(base)
-            continue
-
-
-    # -----------------------------
-    # Texto: Síntesis Evolutiva
-    # -----------------------------
-    ejes_bajos = [x for x in ejes if x["valor"] < MEDIA_TEO]
-    ejes_virtud = [x for x in ejes if x["valor"] >= MEDIA_TEO and x["estado"] in ("equilibrado", "alto_leve")]
-    ejes_moderar = [x for x in ejes if x["estado"] in ("elevado", "excesivo")]
-
-    # virtudes de desafío (sin repetir, manteniendo orden)
-    # ejes bajos (por promedio del eje)
-    ejes_bajos = [x for x in ejes if es_bajo(x["valor"])]
-    
-    virtudes_desafio = []
-    antidotos_desafio = []
-    ejes_desafio_nombres = []
-
-    for x in ejes_bajos:
-        ejes_desafio_nombres.append(x["eje"])
-        antidotos_desafio.append(x["antidoto"])
-    
-        # ✅ SOLO virtudes de los TIPOS que están por debajo de la media
-        for t in x["tipos"]:
-            if es_bajo(porcentaje_scores[t]):
-                v = VIRTUDES_POR_TIPO[t]
-                if v not in virtudes_desafio:
-                    virtudes_desafio.append(v)
-
-
-    virtudes_principales = []
-    ejes_principales_nombres = []
-    
-    for x in ejes:
-        # desarrollados = >= media (incluye equilibrado)
-        if es_desarrollado(x["valor"]) and x["estado"] in ("equilibrado", "alto_leve"):
-            ejes_principales_nombres.append(x["eje"])
-    
-        # ✅ virtudes por TIPO desarrollado (no por eje)
-        for t in x["tipos"]:
-            if es_desarrollado(porcentaje_scores[t]):
-                v = VIRTUDES_POR_TIPO[t]
-                if v not in virtudes_principales:
-                    virtudes_principales.append(v)
-
-
-    # moderación
-    antidotos_moderar = []
-    ejes_moderar_nombres = []
-    for x in ejes_moderar:
-        ejes_moderar_nombres.append(x["eje"])
-        antidotos_moderar.append(x["antidoto"])
-
-    sintesis_parrafos = []
-
-    if ejes_desafio_nombres:
-        p1 = (
-            f"Aquí se encuentra tu principal desafío evolutivo en los ejes del "
-            f"{juntar_lista_humana(ejes_desafio_nombres)}. "
-            f"Las virtudes a desarrollar son {juntar_lista_humana(virtudes_desafio)}, "
-            f"integrando profundidad interior con expresión auténtica."
-        )
-        # Antídotos oficiales del modelo
-        p1 += f" Antídotos: {juntar_lista_humana(list(dict.fromkeys(antidotos_desafio)))}."
-        sintesis_parrafos.append(p1)
-
-    if ejes_principales_nombres:
-        p2 = (
-            f"Tus principales virtudes son {juntar_lista_humana(virtudes_principales)}."
-        )
-        sintesis_parrafos.append(p2)
-
-    if ejes_moderar_nombres:
-        p3 = (
-            f"Estas cualidades constituyen pilares de tu estructura personal, "
-            f"aunque será importante moderarlas cuando se intensifiquen en exceso. "
-            )
-        sintesis_parrafos.append(p3)
-
-    
-    # Eneatipo principal
-    max_score = max(scores.values()) if scores else 0
-    top_types = [t for t, s in scores.items() if s == max_score and max_score > 0]
-    
-    # 🔥 NUEVA LÓGICA DE DESEMPATE POR ALA
-    if len(top_types) > 1:
-        mejor_tipo = None
-        mejor_valor_ala = -1
-    
-        for tipo in top_types:
-            ala_izq, ala_der = ALAS[tipo]
-            valor_ala = max(
-                porcentaje_scores.get(ala_izq, 0),
-                porcentaje_scores.get(ala_der, 0)
-            )
-    
-            if valor_ala > mejor_valor_ala:
-                mejor_valor_ala = valor_ala
-                mejor_tipo = tipo
-    
-        top_types = [mejor_tipo]
-    
-    sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-    sorted_porcentajes = [(t, porcentaje_scores[t]) for (t, _) in sorted_scores]
-
-    # -----------------------------
-    # Ala (Wing) del tipo principal
-    # -----------------------------
-    ala_textos = []
-    
-    if top_types:
-        principal = top_types[0]
-    
-        izq, der = ALAS[principal]
-        pct_izq = porcentaje_scores.get(izq, 0)
-        pct_der = porcentaje_scores.get(der, 0)
-    
-        if pct_izq > pct_der:
-            clave = f"{principal}w{izq}"
-            txt = DESCRIPCION_ALAS.get(clave)
-            if txt:
-                ala_textos = [txt]
-        elif pct_der > pct_izq:
-            clave = f"{principal}w{der}"
-            txt = DESCRIPCION_ALAS.get(clave)
-            if txt:
-                ala_textos = [txt]
-        else:
-            # empate -> mostrar ambas descripciones (una por línea)
-            clave1 = f"{principal}w{izq}"
-            clave2 = f"{principal}w{der}"
-            txt1 = DESCRIPCION_ALAS.get(clave1)
-            txt2 = DESCRIPCION_ALAS.get(clave2)
-            ala_textos = [t for t in (txt1, txt2) if t]
-
-
-
-    
-    eneatipo_textos = {
+ENEATIPO_TEXTOS = {
     1: {
         "titulo": "🟡 Tipo 1 — El Reformador",
         "descripcion": """Personas éticas, con fuerte sentido del bien y del mal, buscan mejorar el mundo y la perfección. 
@@ -2275,6 +1814,472 @@ def result():
 },
 
 }
+
+@app.get("/result")
+def result():
+    if not session.get("pago_ok"):
+        return redirect(url_for("index"))
+    questions = load_questions()
+    answers = session.get("answers", {})
+
+    # Contar cuántas respuestas marcaste en total
+    total_marked = sum(1 for qid, val in answers.items() if val)
+
+    # Calcular scores por tipo
+    scores = {t: 0 for t in range(1, 10)}
+    for q in questions:
+        qid = str(q["id"])
+        if answers.get(qid):
+            scores[q["type"]] += 1
+
+    # Transformar a porcentajes (sobre total_marked)
+    porcentaje_scores = {}
+    for tipo, score in scores.items():
+        porcentaje = (score / total_marked * 100) if total_marked > 0 else 0
+        porcentaje_scores[tipo] = round(porcentaje, 1)
+       
+    # ✅ NUEVO: labels/values para el radar (en orden 1..9)
+    labels = [str(i) for i in range(1, 10)]
+    values = [porcentaje_scores[i] for i in range(1, 10)]
+    
+
+    # -----------------------------
+    # Ejes de Afinidad
+    # -----------------------------
+    afinidades = []
+
+    for eje, cfg in EJES_AFINIDAD.items():
+        tipos = cfg["tipos"]
+        prom = round(sum(porcentaje_scores[t] for t in tipos) / len(tipos), 1)
+        estado = clasificar_eje(prom)
+    
+        afinidades.append({
+            "eje": eje,
+            "tipos": tipos,   # ✅ AGREGAR ESTA LÍNEA
+            "valor": prom,
+            "estado": estado,
+            "descripcion": cfg["descripcion"],
+            "perfil_alto": cfg["perfil_alto"],
+            "perfil_bajo": cfg["perfil_bajo"],
+        })
+
+
+    
+    # -----------------------------
+    # Texto: Ejes de Afinidad (como lo indicaste)
+    # -----------------------------
+    afinidades_parrafos = []
+    
+    for a in afinidades:
+        eje = a["eje"]
+        v = a["valor"]
+    
+        txt = a["descripcion"] + "\n\n"
+    
+        # estado
+        if es_bajo(v):
+            txt += "Este eje aparece por debajo de la media, lo que indica que es un área a desarrollar."
+        elif abs(v - 11.1) <= 0.1:
+            txt += "Este eje aparece equilibrado, lo que indica que estas cualidades están presentes de forma estable."
+        else:
+            txt += "Este eje aparece por encima de la media, lo que indica que posees estas características."
+    
+        # ✅ NUEVO: perfiles (sin tocar nada de arriba)
+        perfil_cfg = EJES_AFINIDAD.get(eje, {})
+        if es_bajo(v):
+            perfil = perfil_cfg.get("perfil_bajo", "")
+        else:
+            perfil = perfil_cfg.get("perfil_alto", "")
+    
+        if perfil:
+            txt += "\n\n" + perfil
+    
+        afinidades_parrafos.append(txt)
+
+
+    
+    # -----------------------------
+    # Síntesis de Afinidades (mismo formato que tu síntesis)
+    # -----------------------------
+    ejes_afinidad_bajos = [a for a in afinidades if es_bajo(a["valor"])]
+    ejes_afinidad_ok = [a for a in afinidades if not es_bajo(a["valor"])]
+    
+    # palabras por tipos bajo / ok
+    palabras_desafio = []
+    for a in ejes_afinidad_bajos:
+        for t in a["tipos"]:
+            p = PALABRAS_AFINIDAD_POR_TIPO.get(t)
+            if p and p not in palabras_desafio:
+                palabras_desafio.append(p)
+    
+    palabras_virtudes = []
+    for a in ejes_afinidad_ok:
+        for t in a["tipos"]:
+            p = PALABRAS_AFINIDAD_POR_TIPO.get(t)
+            if p and p not in palabras_virtudes:
+                palabras_virtudes.append(p)
+    
+    sintesis_afinidades_parrafos = []
+    
+    if ejes_afinidad_bajos:
+        nombres_bajos = [a["eje"] for a in ejes_afinidad_bajos]
+        p1 = (
+            f"Aquí se encuentra tu principal desafío evolutivo en los ejes de "
+            f"{juntar_lista_humana(nombres_bajos)}. "
+            f"Las virtudes a desarrollar son {juntar_lista_humana(palabras_desafio)}."
+        )
+        sintesis_afinidades_parrafos.append(p1)
+    
+    if ejes_afinidad_ok:
+        p2 = f"Tus principales virtudes son {juntar_lista_humana(palabras_virtudes)}."
+        sintesis_afinidades_parrafos.append(p2)
+    
+    # tal como lo pediste (frase fija)
+    sintesis_afinidades_parrafos.append(
+        "Estas cualidades constituyen pilares de tu estructura personal, aunque será importante moderarlas cuando se intensifiquen en exceso."
+    )
+    
+    opuestos = []
+    opuestos_parrafos = []
+    
+    for eje, cfg in OPUESTOS_COMPLEMENTARIOS.items():
+        tipos = cfg["tipos"]
+        prom = round(sum(porcentaje_scores[t] for t in tipos) / len(tipos), 1)
+        estado = clasificar_eje(prom)
+    
+        opuestos.append({
+            "eje": eje,
+            "valor": prom,
+            "estado": estado,
+            "tipos": tipos,
+            "virtudes": cfg.get("virtudes", {}),
+        })
+    
+        txt = cfg["descripcion"] + "\n\n"
+    
+        if es_bajo(prom):
+            txt += cfg["msg_bajo"]
+        elif abs(prom - 11.1) <= 0.1:
+            txt += cfg["msg_equilibrado"]
+        else:
+            txt += cfg["msg_alto"]
+    
+        # Luz / sombra del eje (siempre visible)
+        txt += "\n\n" + cfg["luz"]
+        txt += "\n" + cfg["sombra"]
+    
+        opuestos_parrafos.append(txt)
+
+    ejes_bajo = [o["eje"] for o in opuestos if es_bajo(o["valor"])]
+    ejes_exceso = [o["eje"] for o in opuestos if o["estado"] in ("elevado", "excesivo")]
+    
+    virtudes_desafio = []
+    virtudes_ok = []
+    
+    for o in opuestos:
+        for t in o["tipos"]:
+            palabra = o["virtudes"].get(t)
+            if not palabra:
+                continue
+            if es_bajo(porcentaje_scores[t]):
+                if palabra not in virtudes_desafio:
+                    virtudes_desafio.append(palabra)
+            else:
+                if palabra not in virtudes_ok:
+                    virtudes_ok.append(palabra)
+    
+    opuestos_sintesis = []
+    
+    if ejes_bajo:
+        opuestos_sintesis.append(
+            f"Aquí se encuentra tu principal desafío evolutivo en los ejes del {juntar_lista_humana(ejes_bajo)}. "
+            f"Las virtudes a desarrollar son {juntar_lista_humana(virtudes_desafio)}."
+        )
+    
+    if virtudes_ok:
+        opuestos_sintesis.append(
+            f"Tus principales virtudes son {juntar_lista_humana(virtudes_ok)}."
+        )
+    
+    if ejes_exceso:
+        opuestos_sintesis.append(
+            "Estas cualidades constituyen pilares de tu estructura personal, aunque será importante moderarlas cuando se intensifiquen en exceso."
+        )
+
+    
+    # -----------------------------
+    # Ejes de equilibrio (promedio)
+    # -----------------------------
+    ejes = []
+    for eje in ORDEN_EJES:
+        cfg = EJES_SIMETRIA[eje]
+        tipos = cfg["tipos"]
+        antidoto = cfg["antidoto"]
+
+        # promedio de porcentajes (regla tuya)
+        prom = sum(porcentaje_scores[t] for t in tipos) / len(tipos)
+        prom = round(prom, 1)
+
+        estado = clasificar_eje(prom)
+
+        virtudes = [VIRTUDES_POR_TIPO[t] for t in tipos]
+        ejes.append({
+            "eje": eje,
+            "valor": prom,
+            "estado": estado,
+            "antidoto": antidoto,
+            "virtudes": virtudes,
+            "tipos": tipos,
+        })
+
+    # -----------------------------
+    # Texto: Análisis de Ejes
+    # -----------------------------
+    analisis_ejes_parrafos = []
+    for item in ejes:
+        eje = item["eje"]
+        v = item["valor"]
+        est = item["estado"]
+        antidoto = item["antidoto"]
+
+        if eje == "HACER":
+            if es_bajo(v):
+                base = (
+                    "El eje del HACER aparece por debajo de la media, lo que indica que "
+                    "hay algo urgente que necesita ponerse en acción. En esta etapa, el desafío es "
+                    "dejar de evaluar o postergar y hacer lo que debas hacer para avanzar."
+                    f" Antídoto: {antidoto}."
+                )
+            else:
+                base = (
+                    "El eje del HACER se encuentra por encima de la media, indicando una marcada orientación "
+                    "a la acción, ejecución y control. En su luz, esto implica claridad sobre tu ideal de vida "
+                    "y capacidad de concretar; en su sombra, puede traducirse en controlarte y controlar el entorno "
+                    "de forma permanente."
+                )
+                if est in ("elevado", "excesivo"):
+                    base += f" Si esta energía se intensifica, conviene moderarla. Antídoto: {antidoto}."
+            analisis_ejes_parrafos.append(base)
+            continue
+    
+        if eje == "COMUNICAR":
+            if es_bajo(v):
+                base = (
+                  "El eje del COMUNICAR aparece por debajo de la media, lo que indica que "
+                  "hay algo importante que no estás diciendo o expresando. Esto se vincula con tu mundo interno: "
+                  "aunque tema las consecuencias, comunicar lo esencial es parte de tu sanación."
+                  f" Antídoto: {antidoto}."
+                )
+            else:
+                base = (
+                  "El eje del COMUNICAR se encuentra por encima de la media. En su luz, "
+                  "indica una buena capacidad de comunicación: saber escuchar, llegar al otro y conectar con empatía; "
+                  "en su sombra, puede aparecer hablar mucho sin decir lo esencial."
+                )
+                # si está muy alto, sugerimos moderar
+                if item["estado"] in ("elevado", "excesivo"):
+                    base += f" Antídoto: {antidoto}."
+            analisis_ejes_parrafos.append(base)
+            continue
+    
+    
+        if eje == "TENER":
+            if es_bajo(v):
+                base = (
+                    "El eje del TENER aparece por debajo de la media, lo que sugiere una carencia en la forma "
+                    "de sostener recursos, seguridad y valoración interna. Esto puede expresarse como dificultad "
+                    "para reconocer tu propio valor, ordenar prioridades, poner precio/cobrar, administrar o pedir lo "
+                    "que necesitás sin culpa."
+                    f" Antídoto: {antidoto}."
+                )
+            else:
+                base = (
+                    "El eje del TENER se encuentra por encima de la media. En su luz, indica capacidad para trabajar, "
+                    "lograr y alcanzar lo que querés, con decisión y empuje; en su sombra, puede llevar a desatender lo "
+                    "afectivo, lo físico o lo espiritual por una preocupación excesiva por el tener."
+                )
+                if est in ("elevado", "excesivo"):
+                    base += f" Si se intensifica, practicá moderación. Antídoto: {antidoto}."
+            analisis_ejes_parrafos.append(base)
+            continue
+    
+    
+        if eje == "SER":
+            if es_bajo(v):
+                base = (
+                    "El eje del SER aparece por debajo de la media, indicando que hay un llamado a profundizar: "
+                    "mirarte a vos misma y a tu realidad con más honestidad y reflexión. No se trata de aislarse, "
+                    "sino de hacer un trabajo de introspección que te devuelva claridad y sentido."
+                    f" Antídoto: {antidoto}."
+                )
+            else:
+                base = (
+                    "El eje del SER se encuentra por encima de la media. En su luz, indica profundidad y reflexión, "
+                    "una buena mirada de la vida y de vos misma; en su sombra, puede traducirse en encerrarte, "
+                    "aislarte o esconderte, evitando mirar una parte de tu realidad que no te gusta."
+                )
+                if est in ("elevado", "excesivo"):
+                    base += f" Si se intensifica, cuidá no aislarte. Antídoto: {antidoto}."
+            analisis_ejes_parrafos.append(base)
+            continue
+    
+        if eje == "ESTAR":
+            if es_bajo(v):
+                base = (
+                    "El eje del ESTAR aparece por debajo de la media, indicando dificultad para habitar el presente: "
+                    "podés estar pendiente del pasado o del futuro, o viviendo con tensión. El desafío evolutivo es "
+                    "aprender a estar aquí y ahora, sosteniendo tu centro."
+                    f" Antídoto: {antidoto}."
+                )
+            else:
+                base = (
+                    "El eje del ESTAR se encuentra por encima de la media. En su luz, indica presencia y capacidad de "
+                    "vivir el presente con intensidad; en su sombra, puede aparecer una forma de 'estar sin estar': "
+                    "se evita el conflicto o se busca que no haya problemas, pero internamente no hay presencia real."
+                )
+                if est in ("elevado", "excesivo"):
+                    base += f" Si se intensifica, buscá presencia genuina. Antídoto: {antidoto}."
+            analisis_ejes_parrafos.append(base)
+            continue
+
+
+    # -----------------------------
+    # Texto: Síntesis Evolutiva
+    # -----------------------------
+    ejes_bajos = [x for x in ejes if x["valor"] < MEDIA_TEO]
+    ejes_virtud = [x for x in ejes if x["valor"] >= MEDIA_TEO and x["estado"] in ("equilibrado", "alto_leve")]
+    ejes_moderar = [x for x in ejes if x["estado"] in ("elevado", "excesivo")]
+
+    # virtudes de desafío (sin repetir, manteniendo orden)
+    # ejes bajos (por promedio del eje)
+    ejes_bajos = [x for x in ejes if es_bajo(x["valor"])]
+    
+    virtudes_desafio = []
+    antidotos_desafio = []
+    ejes_desafio_nombres = []
+
+    for x in ejes_bajos:
+        ejes_desafio_nombres.append(x["eje"])
+        antidotos_desafio.append(x["antidoto"])
+    
+        # ✅ SOLO virtudes de los TIPOS que están por debajo de la media
+        for t in x["tipos"]:
+            if es_bajo(porcentaje_scores[t]):
+                v = VIRTUDES_POR_TIPO[t]
+                if v not in virtudes_desafio:
+                    virtudes_desafio.append(v)
+
+
+    virtudes_principales = []
+    ejes_principales_nombres = []
+    
+    for x in ejes:
+        # desarrollados = >= media (incluye equilibrado)
+        if es_desarrollado(x["valor"]) and x["estado"] in ("equilibrado", "alto_leve"):
+            ejes_principales_nombres.append(x["eje"])
+    
+        # ✅ virtudes por TIPO desarrollado (no por eje)
+        for t in x["tipos"]:
+            if es_desarrollado(porcentaje_scores[t]):
+                v = VIRTUDES_POR_TIPO[t]
+                if v not in virtudes_principales:
+                    virtudes_principales.append(v)
+
+
+    # moderación
+    antidotos_moderar = []
+    ejes_moderar_nombres = []
+    for x in ejes_moderar:
+        ejes_moderar_nombres.append(x["eje"])
+        antidotos_moderar.append(x["antidoto"])
+
+    sintesis_parrafos = []
+
+    if ejes_desafio_nombres:
+        p1 = (
+            f"Aquí se encuentra tu principal desafío evolutivo en los ejes del "
+            f"{juntar_lista_humana(ejes_desafio_nombres)}. "
+            f"Las virtudes a desarrollar son {juntar_lista_humana(virtudes_desafio)}, "
+            f"integrando profundidad interior con expresión auténtica."
+        )
+        # Antídotos oficiales del modelo
+        p1 += f" Antídotos: {juntar_lista_humana(list(dict.fromkeys(antidotos_desafio)))}."
+        sintesis_parrafos.append(p1)
+
+    if ejes_principales_nombres:
+        p2 = (
+            f"Tus principales virtudes son {juntar_lista_humana(virtudes_principales)}."
+        )
+        sintesis_parrafos.append(p2)
+
+    if ejes_moderar_nombres:
+        p3 = (
+            f"Estas cualidades constituyen pilares de tu estructura personal, "
+            f"aunque será importante moderarlas cuando se intensifiquen en exceso. "
+            )
+        sintesis_parrafos.append(p3)
+
+    
+    # Eneatipo principal
+    max_score = max(scores.values()) if scores else 0
+    top_types = [t for t, s in scores.items() if s == max_score and max_score > 0]
+    
+    # 🔥 NUEVA LÓGICA DE DESEMPATE POR ALA
+    if len(top_types) > 1:
+        mejor_tipo = None
+        mejor_valor_ala = -1
+    
+        for tipo in top_types:
+            ala_izq, ala_der = ALAS[tipo]
+            valor_ala = max(
+                porcentaje_scores.get(ala_izq, 0),
+                porcentaje_scores.get(ala_der, 0)
+            )
+    
+            if valor_ala > mejor_valor_ala:
+                mejor_valor_ala = valor_ala
+                mejor_tipo = tipo
+    
+        top_types = [mejor_tipo]
+    
+    sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    sorted_porcentajes = [(t, porcentaje_scores[t]) for (t, _) in sorted_scores]
+
+    # -----------------------------
+    # Ala (Wing) del tipo principal
+    # -----------------------------
+    ala_textos = []
+    
+    if top_types:
+        principal = top_types[0]
+    
+        izq, der = ALAS[principal]
+        pct_izq = porcentaje_scores.get(izq, 0)
+        pct_der = porcentaje_scores.get(der, 0)
+    
+        if pct_izq > pct_der:
+            clave = f"{principal}w{izq}"
+            txt = DESCRIPCION_ALAS.get(clave)
+            if txt:
+                ala_textos = [txt]
+        elif pct_der > pct_izq:
+            clave = f"{principal}w{der}"
+            txt = DESCRIPCION_ALAS.get(clave)
+            if txt:
+                ala_textos = [txt]
+        else:
+            # empate -> mostrar ambas descripciones (una por línea)
+            clave1 = f"{principal}w{izq}"
+            clave2 = f"{principal}w{der}"
+            txt1 = DESCRIPCION_ALAS.get(clave1)
+            txt2 = DESCRIPCION_ALAS.get(clave2)
+            ala_textos = [t for t in (txt1, txt2) if t]
+
+
+
+    
+    eneatipo_textos = ENEATIPO_TEXTOS
+
     creencias_limitantes = {
         1: "Miedo a PERDER LA LIBERTAD por quedar atrapado en estructuras o situaciones que me asfixian (trabajo, pareja, etc).",
         2: "Miedo a ABRIRME AFECTIVAMENTE, por que puedo sufrir.",
