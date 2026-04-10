@@ -2,6 +2,26 @@
 <html>
 <head>
     <title>Eneagrama Manual</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; }
+        h2 { color: #333; }
+        h3 { color: #555; margin-top: 24px; }
+        label { display: inline-block; width: 180px; font-weight: bold; margin-top: 10px; }
+        input[type="text"], input[type="email"], input[type="number"], select {
+            width: 220px; padding: 5px 8px; border: 1px solid #ccc; border-radius: 4px;
+        }
+        .tipo-row { display: flex; align-items: center; margin: 6px 0; }
+        .tipo-row label { width: 70px; }
+        .tipo-row input { width: 100px; }
+        .tipo-row span { margin-left: 6px; color: #666; }
+        .checkbox-row { margin-top: 6px; display: flex; align-items: center; gap: 8px; }
+        button {
+            margin-top: 24px; padding: 10px 28px; background: #4a4a8a; color: white;
+            border: none; border-radius: 6px; font-size: 16px; cursor: pointer;
+        }
+        button:hover { background: #333366; }
+        hr { margin: 20px 0; border: none; border-top: 1px solid #ddd; }
+    </style>
 </head>
 <body>
 
@@ -15,29 +35,64 @@
         <option value="esencial">Esencial</option>
     </select>
 
-    <br><br>
+    <hr>
 
-    <label>Nombre:</label>
-    <input type="text" name="nombre">
+    <h3>Datos del propietario</h3>
 
-    <br><br>
+    <div><label>Nombre:</label> <input type="text" name="nombre"></div>
+    <div><label>Email:</label> <input type="email" name="email"></div>
+    <div style="margin-top:10px">
+        <label>Sexo:</label>
+        <select name="sexo">
+            <option value="">— seleccionar —</option>
+            <option value="Femenino">Femenino</option>
+            <option value="Masculino">Masculino</option>
+            <option value="Otro">Otro</option>
+        </select>
+    </div>
+    <div><label>Fecha nacimiento:</label> <input type="text" name="fecha_nacimiento" placeholder="DD/MM/AAAA"></div>
+    <div>
+        <label>Hora nacimiento:</label>
+        <input type="text" name="hora_nacimiento" placeholder="HH:MM" id="hora_nacimiento">
+        <div class="checkbox-row" style="margin-left:180px">
+            <input type="checkbox" id="hora_desconocida" name="hora_desconocida" value="1"
+                   onchange="document.getElementById('hora_nacimiento').disabled = this.checked; if(this.checked) document.getElementById('hora_nacimiento').value='';">
+            <label for="hora_desconocida" style="width:auto; font-weight:normal">Desconozco la hora de nacimiento</label>
+        </div>
+    </div>
+    <div><label>Fecha del test:</label> <input type="text" name="fecha_test" placeholder="DD/MM/AAAA"></div>
 
-    <label>Email:</label>
-    <input type="email" name="email">
+    <hr>
 
-    <br><br>
+    <h3>Afirmaciones marcadas</h3>
+    <div>
+        <label>Total marcadas:</label>
+        <input type="number" name="total_marked" min="0" max="270" value="100">
+        <span style="color:#666" id="total_divisor"> / 270</span>
+    </div>
 
-    <h3>Porcentajes</h3>
+    <hr>
+
+    <h3>Porcentaje por tipo</h3>
 
     {% for i in range(1,10) %}
-        Tipo {{i}}: <input type="number" name="t{{i}}" step="0.1"><br>
+    <div class="tipo-row">
+        <label>Tipo {{ i }}:</label>
+        <input type="number" name="t{{ i }}" step="0.1" min="0" max="100" value="0">
+        <span>%</span>
+    </div>
     {% endfor %}
-
-    <br>
 
     <button type="submit">Generar PDF</button>
 
 </form>
+
+<script>
+    document.querySelector('select[name="modelo"]').addEventListener('change', function() {
+        var divisor = this.value === 'esencial' ? '/ 108' : '/ 270';
+        document.getElementById('total_divisor').textContent = ' ' + divisor;
+    });
+</script>
 
 </body>
 </html>
