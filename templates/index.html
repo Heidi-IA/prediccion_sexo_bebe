@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+        <div class="campo" id="campo-sexo">
+            <label for="sexo">Sexo</label>
+            <select name="sexo" id="sexo">
+                <option value="">Seleccionar</option>
+                {% for codigo, nombre in sexos.items() %}
+                    <option value="{{ codigo }}">{{ nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <button type="submit">Consultar</button>
+    </form>
+</div>
+
+{% if error %}
+<div class="card error">
+    <p>{{ error }}</p>
+</div>
+{% endif %}
+
+{% if resultado %}
+<div class="card resultado">
+    {% if resultado.tipo == 'sexo' %}
+        <h2>Resultado</h2>
+        <p><strong>Edad:</strong> {{ resultado.edad }}</p>
+        <p><strong>Mes:</strong> {{ resultado.mes }}</p>
+        <p><strong>Sexo estimado:</strong> {{ resultado.sexo }}</p>
+    {% elif resultado.tipo == 'meses' %}
+        <h2>Meses posibles</h2>
+        <p><strong>Edad:</strong> {{ resultado.edad }}</p>
+        <p><strong>Sexo:</strong> {{ resultado.sexo }}</p>
+        <p><strong>Meses:</strong></p>
+        <ul>
+            {% for mes in resultado.meses %}
+                <li>{{ mes }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+</div>
+{% endif %}
+
+<script>
+    const radios = document.querySelectorAll('input[name="modo"]');
+    const campoMes = document.getElementById('campo-mes');
+    const campoSexo = document.getElementById('campo-sexo');
+    const selectMes = document.getElementById('mes');
+    const selectSexo = document.getElementById('sexo');
+
+    function actualizarModo() {
+        const modo = document.querySelector('input[name="modo"]:checked').value;
+
+        if (modo === 'edad_mes') {
+            campoMes.style.display = 'block';
+            campoSexo.style.display = 'none';
+            selectMes.required = true;
+            selectSexo.required = false;
+            selectSexo.value = '';
+        } else {
+            campoMes.style.display = 'none';
+            campoSexo.style.display = 'block';
+            selectMes.required = false;
+            selectSexo.required = true;
+            selectMes.value = '';
+        }
+    }
+
+    radios.forEach(radio => radio.addEventListener('change', actualizarModo));
+    actualizarModo();
+</script>
+{% endblock %}
