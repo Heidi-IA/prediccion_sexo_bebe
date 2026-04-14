@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-5 text-center">
+
+  {% if mail_ok %}
+    <div class="mb-4">
+      <span style="font-size:4rem;">✅</span>
+    </div>
+    <h2 class="fw-bold mb-3">¡Informe enviado con éxito!</h2>
+    <p class="lead text-muted mb-4">
+      El informe de personalidad con orientación profesional fue generado<br>
+      y enviado a <strong>{{ dest }}</strong>.
+    </p>
+  {% else %}
+    <div class="mb-4">
+      <span style="font-size:4rem;">⚠️</span>
+    </div>
+    <h2 class="fw-bold mb-3">Informe generado</h2>
+    <p class="lead text-muted mb-4">
+      El informe fue procesado correctamente.<br>
+      No se pudo enviar el correo automáticamente — revisá la configuración de <code>MAIL_USERNAME</code> / <code>MAIL_PASSWORD</code> en las variables de entorno.
+    </p>
+  {% endif %}
+
+  <hr class="my-4">
+  <p class="text-muted small">
+    AZ Consultora &nbsp;|&nbsp; @az_coaching.terapeutico &nbsp;|&nbsp; +54 2975203761
+  </p>
+  <a href="{{ url_for('index') }}" class="btn btn-outline-secondary mt-3">
+    Volver al inicio
+  </a>
+
+</div>
+{% endblock %}
