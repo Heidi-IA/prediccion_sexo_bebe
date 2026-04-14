@@ -1,8 +1,2 @@
-flask
-gunicorn
-reportlab
-matplotlib
-numpy
-sqlalchemy
-mercadopago
-psycopg2-binary
+Flask==3.0.3
+gunicorn==22.0.0
