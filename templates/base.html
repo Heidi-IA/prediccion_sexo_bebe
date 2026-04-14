@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Predicción por Concepción</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header class="hero">
+            <h1>Predicción por tabla de concepción</h1>
+            <p>Consultá por edad y mes, o por edad y sexo para ver los meses posibles.</p>
+        </header>
+
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>
