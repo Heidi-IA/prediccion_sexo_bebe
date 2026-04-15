@@ -1,4 +1,8 @@
 from flask import Flask, render_template, request
+from tabla import TABLA, MESES, SEXOS
+
+app = Flask(__name__)
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     resultado = None
@@ -60,7 +64,6 @@ def index():
         error=error,
         modo=modo
     )
-
 
 if __name__ == '__main__':
     app.run(debug=True)
