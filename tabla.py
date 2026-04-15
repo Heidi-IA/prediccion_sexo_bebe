@@ -1,3 +1,23 @@
+MESES = {
+    'ene': 'Enero',
+    'feb': 'Febrero',
+    'mar': 'Marzo',
+    'abr': 'Abril',
+    'may': 'Mayo',
+    'jun': 'Junio',
+    'jul': 'Julio',
+    'ago': 'Agosto',
+    'sep': 'Septiembre',
+    'oct': 'Octubre',
+    'nov': 'Noviembre',
+    'dic': 'Diciembre',
+}
+
+SEXOS = {
+    'Mas': 'Masculino',
+    'Fem': 'Femenino',
+}
+
 TABLA = {
     18: {'ene':'Fem','feb':'Mas','mar':'Fem','abr':'Mas','may':'Mas','jun':'Mas','jul':'Mas','ago':'Mas','sep':'Mas','oct':'Mas','nov':'Mas','dic':'Mas'},
     19: {'ene':'Mas','feb':'Fem','mar':'Mas','abr':'Fem','may':'Fem','jun':'Mas','jul':'Mas','ago':'Fem','sep':'Mas','oct':'Mas','nov':'Fem','dic':'Fem'},
